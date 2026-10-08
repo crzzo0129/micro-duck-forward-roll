@@ -1,0 +1,8 @@
+{
+  "repository": "https://github.com/pollen-robotics/microduck_rl",
+  "commit": "273afe0b31c4ab365b9ff806a927b63ac92b5ddd",
+  "snapshot_date": "2026-10-08",
+  "code_license": "Apache-2.0",
+  "model_license": "Creative Commons BY-SA-NC (upstream wording; exact version unspecified)",
+  "notes": "Source snapshot including robot meshes; local extensions are documented in README.md. Original README is docs/UPSTREAM_README.md."
+}

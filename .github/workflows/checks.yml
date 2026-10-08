@@ -1,0 +1,16 @@
+name: workflow checks
+on: [push, pull_request]
+jobs:
+  workflow-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Check Python syntax
+        run: python -m compileall -q src scripts tests
+      - name: Test cloud workflow and success criteria
+        run: python -m unittest discover -s tests -p 'test_cloud_*.py'
+      - name: Parse project metadata
+        run: python -c "import tomllib; tomllib.load(open('pyproject.toml', 'rb')); tomllib.load(open('uv.lock', 'rb'))"
