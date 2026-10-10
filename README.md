@@ -10,13 +10,16 @@
 
 ## 云端开始（Linux + NVIDIA）
 
+**Ubuntu 24.04 + Python 3.12 基础镜像**：按 [基础镜像配置指南](docs/UBUNTU_CLOUD.md) 拉取仓库后，运行 `bash scripts/setup_cloud.sh --install-system`，再运行 `source .cache/cloud.env`。脚本安装系统库和锁定依赖，不会自动训练。
+
 建议使用 Python 3.12、支持 CUDA 的 NVIDIA 驱动和持久化磁盘。并行环境数受显存和接触复杂度影响，先用 64 个环境验证，再尝试 1024；4096 是后续扩容选项，不保证适合每张卡。
 
 ```bash
 git clone https://github.com/crzzo0129/micro-duck-forward-roll.git
 cd micro-duck-forward-roll
-# 云平台未安装 uv 时：
-python -m pip install uv
+# 已安装系统库、仅缺 uv 时使用独立安装器：
+curl -LsSf https://astral.sh/uv/0.12.23/install.sh | sh
+export PATH="$HOME/.local/bin:$PATH"
 export UV_HTTP_TIMEOUT=600
 uv sync --frozen --python 3.12
 
@@ -76,6 +79,7 @@ uv run python scripts/cloud.py export --checkpoint <model_N.pt> --output outputs
 | `src/mjlab_microduck/tasks/microduck_roulade_env_cfg.py` | 官方前滚翻训练配方及参数 |
 | `src/mjlab_microduck/tasks/mdp.py` | 奖励、旋转累计、头顶接触判定和复位 |
 | `scripts/cloud.py` | 云端检查、短测试、训练、续训、预览、导出和评估 |
+| `scripts/setup_cloud.sh` | Ubuntu 24.04 基础镜像环境配置，不自动训练 |
 | `scripts/evaluate_forward_roll.py` | 批量技能评估，支持零动作负对照 |
 | `tests/test_forward_roll_cfg.py` | 观测、碰撞、奖励符号与站立评估配置测试 |
 | `UPSTREAM.json` / `uv.lock` | 上游来源与依赖版本 |
