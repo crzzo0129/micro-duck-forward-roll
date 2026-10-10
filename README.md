@@ -10,7 +10,7 @@
 
 ## 云端开始（Linux + NVIDIA）
 
-**Ubuntu 24.04 + Python 3.12 基础镜像**：按 [基础镜像配置指南](docs/UBUNTU_CLOUD.md) 拉取仓库后，运行 `bash scripts/setup_cloud.sh --install-system`，再运行 `source .cache/cloud.env`。脚本安装系统库和锁定依赖，不会自动训练。
+**Ubuntu 24.04 + Python 3.12 基础镜像**：按 [基础镜像配置指南](docs/UBUNTU_CLOUD.md) 拉取仓库后，运行 `bash scripts/setup_cloud.sh --install-system`，再运行 `source .cache/cloud.env`。脚本安装系统库和锁定依赖，不会自动训练。多个项目复用镜像或迁移已配置的 `.venv`，请看 [共用基础镜像指南](docs/SHARED_IMAGE.md)。
 
 建议使用 Python 3.12、支持 CUDA 的 NVIDIA 驱动和持久化磁盘。并行环境数受显存和接触复杂度影响，先用 64 个环境验证，再尝试 1024；4096 是后续扩容选项，不保证适合每张卡。
 

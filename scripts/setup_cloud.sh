@@ -4,9 +4,11 @@ set -euo pipefail
 
 usage() {
   cat <<'USAGE'
-Usage: bash scripts/setup_cloud.sh [--install-system] [--skip-gpu-check]
+Usage: bash scripts/setup_cloud.sh [--install-system] [--skip-gpu-check] [--shared] [--base-only]
   --install-system  Install Ubuntu packages using root or sudo.
   --skip-gpu-check  Prepare an image before GPU allocation; skip doctor.
+  --shared          Use /opt/mjlab-venv and /opt/mjlab-tools (requires write access).
+  --base-only       With --shared, install dependencies only, excluding this project.
   --help            Show this message without making any changes.
 
 Default: use existing system libraries, install locked Python dependencies,
@@ -16,16 +18,21 @@ USAGE
 
 install_system=0
 skip_gpu=0
+shared=0
+base_only=0
 for arg in "$@"; do
   case "$arg" in
     --install-system) install_system=1 ;;
     --skip-gpu-check) skip_gpu=1 ;;
+    --shared) shared=1 ;;
+    --base-only) base_only=1 ;;
     --help|-h) usage; exit 0 ;;
     *) printf 'Unknown option: %s\n' "$arg" >&2; usage >&2; exit 2 ;;
   esac
 done
 
 fail() { printf 'ERROR: %s\n' "$*" >&2; exit 1; }
+(( ! base_only || shared )) || fail '--base-only requires --shared.'
 [[ "$(uname -s)" == Linux ]] || fail 'Run this script on the Linux cloud instance.'
 [[ -f /etc/os-release ]] || fail 'Cannot identify the Linux distribution.'
 # shellcheck disable=SC1091
@@ -35,6 +42,13 @@ source /etc/os-release
 
 root_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$root_dir"
+tools_dir="$root_dir/.tools/uv"
+env_dir="$root_dir/.venv"
+if (( shared )); then
+  tools_dir=/opt/mjlab-tools
+  env_dir=/opt/mjlab-venv
+  mkdir -p "$tools_dir" || fail 'Shared setup needs write access to /opt; run as root.'
+fi
 
 if (( ! skip_gpu )); then
   command -v nvidia-smi >/dev/null ||
@@ -69,17 +83,17 @@ done
 [[ -n "$python_bin" ]] || fail 'Python 3.12 missing. Use the ubuntu24.04-py3.12 image.'
 
 # Standalone uv avoids modifying Ubuntu's externally managed system Python.
-if command -v uv >/dev/null; then
+if [[ -x "$tools_dir/uv" ]]; then
+  uv_bin="$tools_dir/uv"
+elif (( ! shared )) && command -v uv >/dev/null; then
   uv_bin="$(command -v uv)"
-elif [[ -x "$root_dir/.tools/uv/uv" ]]; then
-  uv_bin="$root_dir/.tools/uv/uv"
 else
-  mkdir -p "$root_dir/.cache" "$root_dir/.tools/uv"
+  mkdir -p "$root_dir/.cache" "$tools_dir"
   curl --fail --show-error --location --retry 3 \
     https://astral.sh/uv/0.12.23/install.sh -o "$root_dir/.cache/uv-install.sh"
-  env UV_INSTALL_DIR="$root_dir/.tools/uv" UV_NO_MODIFY_PATH=1 \
+  env UV_INSTALL_DIR="$tools_dir" UV_NO_MODIFY_PATH=1 \
     sh "$root_dir/.cache/uv-install.sh"
-  uv_bin="$root_dir/.tools/uv/uv"
+  uv_bin="$tools_dir/uv"
 fi
 
 export UV_HTTP_TIMEOUT="${UV_HTTP_TIMEOUT:-600}"
@@ -97,12 +111,43 @@ mkdir -p "$root_dir/.cache"
 } > "$root_dir/.cache/cloud.env"
 
 "$uv_bin" --version
-"$uv_bin" sync --frozen --python "$python_bin"
+if (( shared )); then
+  # Keep other projects' packages; resolve this dependency stack from the lock.
+  UV_PROJECT_ENVIRONMENT="$env_dir" "$uv_bin" sync --frozen --inexact \
+    --no-install-project --python "$python_bin"
+  {
+    printf 'export VIRTUAL_ENV=%q\n' "$env_dir"
+    printf 'export PATH=%q:"$PATH"\n' "$env_dir/bin:$tools_dir"
+    printf 'export MUJOCO_GL=egl\n'
+  } > "$env_dir/activate-mjlab.sh"
+  mkdir -p "$env_dir/share/mjlab-base"
+  cp pyproject.toml uv.lock "$env_dir/share/mjlab-base/"
+  "$uv_bin" pip freeze --python "$env_dir/bin/python" > "$env_dir/share/mjlab-base/packages.txt"
+  cp "$env_dir/activate-mjlab.sh" "$root_dir/.cache/cloud.env"
+  if (( ! base_only )); then
+    "$uv_bin" pip install --python "$env_dir/bin/python" --no-deps --editable "$root_dir"
+  fi
+else
+  UV_PROJECT_ENVIRONMENT="$env_dir" "$uv_bin" sync --frozen --python "$python_bin"
+fi
 if (( ! skip_gpu )); then
-  "$uv_bin" run --no-sync python scripts/cloud.py doctor
+  if (( base_only )); then
+    "$env_dir/bin/python" -c 'import torch, mujoco, warp, mjlab; print("Torch:", torch.__version__, "CUDA:", torch.version.cuda); assert torch.cuda.is_available(), "Torch cannot access CUDA"; warp.init(); print("MJlab base imports OK")'
+  else
+    "$env_dir/bin/python" scripts/cloud.py doctor
+  fi
 fi
 printf '\nEnvironment prepared. No training was started.\n'
 printf 'In each new terminal, run: source %q\n' "$root_dir/.cache/cloud.env"
+if (( shared )); then
+  printf 'Reusable image activation: source %q\n' "$env_dir/activate-mjlab.sh"
+  if (( base_only )); then
+    printf 'Base only: project code was not installed. Save /opt into your image.\n'
+    exit 0
+  fi
+  printf 'Use python scripts/cloud.py smoke, then python scripts/cloud.py train --num-envs 1024\n'
+  exit 0
+fi
 printf 'On the GPU instance, run smoke before training:\n'
 printf '  uv run python scripts/cloud.py smoke\n'
 printf '  uv run python scripts/cloud.py train --num-envs 1024\n'

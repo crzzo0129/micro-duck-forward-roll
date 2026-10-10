@@ -49,6 +49,8 @@ source .cache/cloud.env
 
 ## 4. 在云端测试和训练
 
+如果要供其他 MJlab 项目复用镜像，见 [共用基础镜像与已有环境迁移](SHARED_IMAGE.md)。下面的 `uv run` 命令用于默认的项目独立环境；共用环境使用该指南中的 `python` 命令。
+
 ```bash
 uv run python scripts/cloud.py smoke
 # 上一条必须成功，再开始正式训练
