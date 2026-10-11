@@ -2,6 +2,8 @@
 
 MJlab 1.3.0 默认选择可见 GPU 0。`cloud.py` 现在支持 `--gpu-ids`，显式转发给 MJlab；旧命令继续默认单卡。MJlab 用 torchrunx 每卡启动一个 worker，RSL-RL 通过 NCCL 同步 PPO 梯度，共同训练一个策略。不是四个互不相关的策略。[上游固定版本代码](https://github.com/mujocolab/mjlab/blob/v1.3.0/src/mjlab/scripts/train.py)
 
+MJlab 的 tyro 配置启用了 Python 集合语法，直接调用上游 `mjlab.scripts.train` 时 GPU 列表应是一个参数，例如 `--gpu-ids '[0,1,2,3]'`。本项目的 `python -m mjlab_microduck.train_cli` 会自动把空格分隔的 GPU 数字转换成这种列表；`cloud.py` 和速度对比工具均经过该入口。若遇到 `no type matching ... from ['0']`，先更新仓库，已有 editable 安装无需重装依赖。[上游集合语法配置](https://github.com/mujocolab/mjlab/blob/v1.3.0/src/mjlab/__init__.py)
+
 ## 四卡启动
 
 已有训练不要直接叠加运行另一套训练。先记录当前保存的检查点，再在原终端停止当前训练，更新代码后启动新任务。更新代码不会让已经运行的进程自动变成多卡。
@@ -71,3 +73,5 @@ H100 上小策略网络和小仿真批量可能无法充分占满算力。检查
 ## 验证范围
 
 本地 GPU 参数转发、单卡/多卡 smoke 隔离及已有流程测试共 12 项通过，四卡 dry-run 通过。真实 CLI 测试已添加并拦截训练启动，但本次 Windows 检查在 Warp 导入阶段超过 40 秒限时，未完成。没有在本地训练，也没有四张 H100 的吞吐数据。云端 CLI 解析、四卡 smoke、NCCL 通信、资源占用和技能效果仍需实际验证。
+
+后续修复 GPU 参数列表语法：20 项轻量检查通过，其中 GPU 解析回归使用本环境实际 tyro、相同 `gpu_ids` 联合类型及 MJlab 的三项解析配置，验证单卡、四卡、all、None；不导入 MJlab/Warp、不运行训练。完整任务启动、四卡通信和速度测量仍待云端验证。

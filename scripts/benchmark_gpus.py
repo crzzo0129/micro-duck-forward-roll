@@ -10,6 +10,7 @@ import argparse
 from datetime import datetime, timezone
 import json
 import statistics
+import subprocess
 import sys
 import time
 import uuid
@@ -117,5 +118,5 @@ def main() -> None:
 if __name__ == "__main__":
     try:
         main()
-    except (ValueError, RuntimeError) as exc:
+    except (ValueError, RuntimeError, subprocess.CalledProcessError) as exc:
         raise SystemExit(str(exc)) from exc
