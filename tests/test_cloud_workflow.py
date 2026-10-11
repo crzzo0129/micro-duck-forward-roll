@@ -15,6 +15,42 @@ from roll_metrics import RollTracker
 
 
 class WorkflowTests(unittest.TestCase):
+    def test_gpu_selection_rejects_ambiguous_or_invalid_ids(self):
+        for values in (["all", "0"], ["-1"], ["0", "00"], [], ["bad"]):
+            with self.subTest(values=values), self.assertRaises(ValueError):
+                cloud.gpu_selection(values)
+        self.assertEqual(cloud.gpu_selection(["00", "1"]), ["0", "1"])
+
+    def test_four_gpu_training_and_smoke_keep_per_gpu_environment_count(self):
+        args = SimpleNamespace(num_envs=4096, iterations=1000, seed=42,
+            run_name="four_gpu", checkpoint=None, gpu_ids=["0", "1", "2", "3"])
+        train = cloud.training_command(args)
+        smoke = cloud.training_command(args, smoke=True)
+        for command in (train, smoke):
+            start = command.index("--gpu-ids")
+            self.assertEqual(command[start + 1:start + 5], ["0", "1", "2", "3"])
+        self.assertEqual(train[train.index("--env.scene.num-envs") + 1], "4096")
+        self.assertEqual(smoke[smoke.index("--env.scene.num-envs") + 1], "64")
+        self.assertEqual(smoke[smoke.index("--agent.max-iterations") + 1], "5")
+
+    def test_all_gpu_selection_and_single_gpu_default_forwarded(self):
+        args = SimpleNamespace(num_envs=1024, iterations=10, seed=42,
+            run_name="test", checkpoint=None)
+        self.assertEqual(cloud.training_command(args)[-2:], ["--gpu-ids", "0"])
+        args.gpu_ids = ["all"]
+        self.assertEqual(cloud.training_command(args)[-2:], ["--gpu-ids", "all"])
+
+    def test_single_gpu_smoke_does_not_authorize_multi_gpu_training(self):
+        with tempfile.TemporaryDirectory() as directory:
+            receipt = Path(directory) / "smoke.json"
+            receipt.write_text('{"fingerprint":"test","runtime":{},"gpu_ids":["0"]}')
+            with patch.object(cloud, "RECEIPT", receipt), \
+                 patch.object(cloud, "fingerprint", return_value="test"), \
+                 patch.object(cloud, "runtime_info", return_value={}):
+                cloud.require_smoke(["0"])
+                with self.assertRaisesRegex(RuntimeError, "GPU selection changed"):
+                    cloud.require_smoke(["0", "1", "2", "3"])
+
     def test_checkpoint_iteration_sorting(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

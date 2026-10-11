@@ -14,6 +14,8 @@
 
 ## 云端待验证
 
+2026-10-11：新增多卡 GPU 参数，标准库流程测试 12 项通过，四卡 dry-run 命令生成通过。已增加拦截训练启动的真实 CLI 参数测试，但本次 Windows 检查在 Warp 导入阶段超过 40 秒限时，没有完成该项解析验证。未运行本地训练。真实 CLI 解析、四卡 H100 的 smoke、NCCL 通信与吞吐测量待云端验证，见 [多卡指南](MULTI_GPU.md)。
+
 按照用户要求，不在本地训练。以下必须在 Linux + NVIDIA 云实例执行：
 
 1. `uv sync --frozen --python 3.12` 的 Linux 首次安装及 CUDA / Warp doctor。

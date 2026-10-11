@@ -33,6 +33,8 @@ uv run python scripts/cloud.py train --num-envs 1024 --run-name first_roll
 
 训练会使用当前目录下的 `logs/rsl_rl/microduck_forward_roll/`。把仓库放在云平台的持久化磁盘；训练结束或关机前保存整个运行目录。检查点、视频、缓存、密钥均不上传 GitHub。
 
+默认只使用一张 GPU。多卡训练需指定 `--gpu-ids 0 1 2 3` 或 `--gpu-ids all`；`--num-envs` 是每卡环境数。四张 H100 的启动、续训与吞吐检查见 [多卡训练指南](docs/MULTI_GPU.md)。
+
 ## 日志与续训
 
 ```bash

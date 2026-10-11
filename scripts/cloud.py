@@ -40,6 +40,7 @@ def runtime_info() -> dict:
                      ("mjlab", "torch", "mujoco", "mujoco-warp", "warp-lang", "better-actuator-models")},
         "cuda": torch.version.cuda,
         "gpu": torch.cuda.get_device_name(0) if torch.cuda.is_available() else None,
+        "visible_gpus": [torch.cuda.get_device_name(i) for i in range(torch.cuda.device_count())],
     }
 
 
@@ -108,6 +109,18 @@ def doctor() -> dict:
     return info
 
 
+def gpu_selection(values: list[str]) -> list[str]:
+    """mjlab IDs index the GPUs visible to this process, not host physical IDs."""
+    if values == ["all"]:
+        return values
+    if not values or any(not value.isascii() or not value.isdigit() for value in values):
+        raise ValueError("--gpu-ids expects 'all' or non-negative GPU indices, e.g. 0 1 2 3")
+    normalized = [str(int(value)) for value in values]
+    if len(set(normalized)) != len(normalized):
+        raise ValueError("--gpu-ids must not contain duplicate indices")
+    return normalized
+
+
 def training_command(args, smoke: bool = False) -> list[str]:
     command = [sys.executable, "-m", "mjlab_microduck.train_cli", TASK,
                "--env.scene.num-envs", str(64 if smoke else args.num_envs),
@@ -115,6 +128,7 @@ def training_command(args, smoke: bool = False) -> list[str]:
                "--agent.logger", "tensorboard", "--agent.seed", str(args.seed),
                "--agent.run-name", "smoke" if smoke else args.run_name,
                "--enable-nan-guard", "True"]
+    command += ["--gpu-ids", *gpu_selection(getattr(args, "gpu_ids", ["0"]))]
     if smoke:
         command += ["--agent.experiment-name", "microduck_forward_roll_smoke",
                     "--agent.save-interval", "1"]
@@ -131,12 +145,14 @@ def training_command(args, smoke: bool = False) -> list[str]:
     return command
 
 
-def require_smoke() -> None:
+def require_smoke(gpu_ids: list[str] | None = None) -> None:
     if not RECEIPT.is_file():
         raise RuntimeError("Run `uv run python scripts/cloud.py smoke` before a long training run.")
     receipt = json.loads(RECEIPT.read_text())
     if receipt["fingerprint"] != fingerprint() or receipt["runtime"] != runtime_info():
         raise RuntimeError("Source, dependencies or GPU changed. Run smoke again first.")
+    if receipt.get("gpu_ids", ["0"]) != gpu_selection(gpu_ids or ["0"]):
+        raise RuntimeError("GPU selection changed. Run smoke with the same --gpu-ids first.")
 
 
 def main() -> None:
@@ -145,7 +161,10 @@ def main() -> None:
     sub.add_parser("doctor")
     for name in ("smoke", "train"):
         p = sub.add_parser(name)
-        p.add_argument("--num-envs", type=int, default=1024)
+        p.add_argument("--num-envs", type=int, default=1024,
+                       help="Environments PER GPU in train; smoke always uses 64 per GPU")
+        p.add_argument("--gpu-ids", nargs="+", default=["0"],
+                       help="Visible GPU indices, e.g. 0 1 2 3, or all; default: 0")
         p.add_argument("--iterations", type=int, default=10000,
                        help="PPO updates in this invocation (additional updates when resuming)")
         p.add_argument("--seed", type=int, default=42)
@@ -164,6 +183,11 @@ def main() -> None:
         if name == "evaluate":
             p.add_argument("--seed", type=int, default=42)
     args = parser.parse_args()
+    if hasattr(args, "gpu_ids"):
+        try:
+            args.gpu_ids = gpu_selection(args.gpu_ids)
+        except ValueError as exc:
+            parser.error(str(exc))
     if hasattr(args, "num_envs") and args.num_envs < 1:
         parser.error("--num-envs must be positive")
     if hasattr(args, "iterations") and args.iterations < 1:
@@ -185,11 +209,12 @@ def main() -> None:
              "--num-envs", "1", "--onnx-file", str(onnx)])
         validate_onnx(onnx)
         RECEIPT.write_text(json.dumps({"fingerprint": fingerprint(), "runtime": info,
+            "gpu_ids": args.gpu_ids,
             "checkpoint": str(checkpoint), "passed_at": datetime.now(timezone.utc).isoformat()}, indent=2))
         print("Smoke passed: PPO updates, NaN guard, ONNX shape and finite outputs.")
     elif args.command == "train":
         if not args.dry_run:
-            require_smoke()
+            require_smoke(args.gpu_ids)
         run(training_command(args), args.dry_run)
     else:
         checkpoint = checkpoint_path(args.checkpoint)
