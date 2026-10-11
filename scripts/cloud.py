@@ -186,6 +186,9 @@ def main() -> None:
             p.add_argument("--seconds", type=float, default=5.0)
             p.add_argument("--seed", type=int, default=42)
             p.add_argument("--output-dir", default="outputs/videos")
+            p.add_argument("--isolated-render", action="store_true",
+                           help="Save GPU poses, then render in a separate process")
+            p.add_argument("--render-backend", choices=("egl", "osmesa"), default="egl")
     args = parser.parse_args()
     if hasattr(args, "gpu_ids"):
         try:
@@ -204,6 +207,8 @@ def main() -> None:
             parser.error(str(exc))
         if args.num_envs != 1:
             parser.error("record uses exactly one environment")
+        if args.render_backend != "egl" and not args.isolated_render:
+            parser.error("--render-backend requires --isolated-render")
     os.chdir(ROOT)
     if args.command == "doctor":
         doctor()
@@ -244,9 +249,12 @@ def main() -> None:
                        "--checkpoint-file", str(checkpoint), "--num-envs", "1",
                        "--onnx-file", str(output)]
         elif args.command == "record":
-            command = [sys.executable, "scripts/record_forward_roll.py",
+            script = "scripts/record_isolated.py" if args.isolated_render else "scripts/record_forward_roll.py"
+            command = [sys.executable, "-u", script,
                        "--checkpoint", str(checkpoint), "--seconds", str(args.seconds),
                        "--seed", str(args.seed), "--output-dir", args.output_dir]
+            if args.isolated_render:
+                command += ["--render-backend", args.render_backend]
         else:
             command = [sys.executable, "scripts/evaluate_forward_roll.py",
                        "--checkpoint", str(checkpoint), "--num-envs", str(args.num_envs),

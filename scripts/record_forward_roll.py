@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 from dataclasses import asdict
 from datetime import datetime, timezone
+import faulthandler
 import json
 import math
 import os
@@ -18,6 +19,7 @@ def recording_steps(seconds: float, dt: float) -> int:
 
 
 def main() -> None:
+    faulthandler.enable()
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--checkpoint", type=Path, required=True)
     parser.add_argument("--seconds", type=float, default=5.0)

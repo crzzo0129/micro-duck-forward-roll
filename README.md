@@ -79,6 +79,8 @@ uv run python scripts/cloud.py export --checkpoint <model_N.pt> --output outputs
 
 `record` 使用一张 GPU、单个站立起步环境，保持 61D 零命令输入，默认录制 5 秒后自动退出。MP4 和记录参数 JSON 保存到 `outputs/videos/`，可用 `--output-dir` 指定目录。遇到非超时终止会提前结束，并在 JSON 中标记 `ended_early`；一段视频不是批量成功率。`play --video` 的视频仍在检查点目录的 `videos/play/`。
 
+若录制出现 `SIGABRT` 或原生渲染崩溃，可增加 `--isolated-render`，先保存 GPU 轨迹，再由独立进程渲染同一段动作。轨迹保留供重试，并提供软件渲染备选，见 [视频排错指南](docs/VIDEO_TROUBLESHOOTING.md)。
+
 若旧版 `play` 在 Viser 创建速度滑块时出现 `assert max >= value >= min`，更新代码即可；前滚翻播放模式现在显示固定零命令说明，不创建不合法的速度滑块。已有检查点可继续使用，无需重训。MP4 录制仍需要云平台的 EGL 图形库。
 
 ## 项目拓展

@@ -25,7 +25,7 @@ class VideoTests(unittest.TestCase):
              patch.object(cloud, "run") as run:
             cloud.main()
         command, dry_run = run.call_args.args
-        self.assertEqual(command[1], "scripts/record_forward_roll.py")
+        self.assertEqual(command[1:3], ["-u", "scripts/record_forward_roll.py"])
         self.assertEqual(command[command.index("--seconds") + 1], "8.0")
         self.assertNotIn("--viewer", command)
         self.assertTrue(dry_run)
