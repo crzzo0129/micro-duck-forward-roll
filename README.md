@@ -35,6 +35,8 @@ uv run python scripts/cloud.py train --num-envs 1024 --run-name first_roll
 
 默认只使用一张 GPU。多卡训练需指定 `--gpu-ids 0 1 2 3` 或 `--gpu-ids all`；`--num-envs` 是每卡环境数。四张 H100 的启动、续训与吞吐检查见 [多卡训练指南](docs/MULTI_GPU.md)。
 
+希望总计仍为 1024 个环境时，使用 `python scripts/benchmark_gpus.py --total-envs 1024` 在云端短测单/双/四卡，依据实际每轮时间选择配置；该命令会运行短训练，先保存并停止现有任务。共用环境直接运行，独立环境加 `uv run` 前缀。
+
 ## 日志与续训
 
 ```bash
