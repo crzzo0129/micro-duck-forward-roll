@@ -4781,6 +4781,20 @@ class VelocityCommandCommandOnlyCfg(UniformVelocityCommandCfg):
         return VelocityCommandCommandOnly(self, env)
 
 
+class ForwardRollPlayCommand(VelocityCommandCommandOnly):
+    """Keep idle command slots, without the velocity viewer's nonzero sliders."""
+
+    def create_gui(self, name, server, get_env_idx, on_change=None, request_action=None):
+        with server.gui.add_folder(name.capitalize()):
+            server.gui.add_markdown("前滚翻播放使用固定零速度命令；不需要速度摇杆。")
+
+
+@_dataclass(kw_only=True)
+class ForwardRollPlayCommandCfg(VelocityCommandCommandOnlyCfg):
+    def build(self, env: ManagerBasedRlEnv) -> "ForwardRollPlayCommand":
+        return ForwardRollPlayCommand(self, env)
+
+
 class RelativeHeadingVelocityCommand(VelocityCommandCommandOnly):
     """Velocity command where cmd[2] is the heading error in the robot's body frame.
 

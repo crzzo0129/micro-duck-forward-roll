@@ -171,7 +171,7 @@ def main() -> None:
         p.add_argument("--run-name", default="forward_roll")
         p.add_argument("--checkpoint")
         p.add_argument("--dry-run", action="store_true")
-    for name in ("play", "export", "evaluate"):
+    for name in ("play", "export", "evaluate", "record"):
         p = sub.add_parser(name)
         p.add_argument("--checkpoint", required=True)
         p.add_argument("--num-envs", type=int, default=128 if name == "evaluate" else 1)
@@ -182,6 +182,10 @@ def main() -> None:
             p.add_argument("--output", default="outputs/forward_roll.onnx")
         if name == "evaluate":
             p.add_argument("--seed", type=int, default=42)
+        if name == "record":
+            p.add_argument("--seconds", type=float, default=5.0)
+            p.add_argument("--seed", type=int, default=42)
+            p.add_argument("--output-dir", default="outputs/videos")
     args = parser.parse_args()
     if hasattr(args, "gpu_ids"):
         try:
@@ -192,6 +196,14 @@ def main() -> None:
         parser.error("--num-envs must be positive")
     if hasattr(args, "iterations") and args.iterations < 1:
         parser.error("--iterations must be positive")
+    if args.command == "record":
+        from record_forward_roll import recording_steps
+        try:
+            recording_steps(args.seconds, 0.02)
+        except ValueError as exc:
+            parser.error(str(exc))
+        if args.num_envs != 1:
+            parser.error("record uses exactly one environment")
     os.chdir(ROOT)
     if args.command == "doctor":
         doctor()
@@ -231,6 +243,10 @@ def main() -> None:
             command = [sys.executable, "scripts/export.py", TASK,
                        "--checkpoint-file", str(checkpoint), "--num-envs", "1",
                        "--onnx-file", str(output)]
+        elif args.command == "record":
+            command = [sys.executable, "scripts/record_forward_roll.py",
+                       "--checkpoint", str(checkpoint), "--seconds", str(args.seconds),
+                       "--seed", str(args.seed), "--output-dir", args.output_dir]
         else:
             command = [sys.executable, "scripts/evaluate_forward_roll.py",
                        "--checkpoint", str(checkpoint), "--num-envs", str(args.num_envs),

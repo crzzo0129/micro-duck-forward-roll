@@ -28,6 +28,9 @@ def test_eval_cannot_spawn_halfway_or_override_standing():
     assert cfg.curriculum == {}
     assert cfg.observations["actor"].enable_corruption is False
     assert cfg.commands["twist"].ranges.lin_vel_x == (0, 0)
+    assert cfg.commands["twist"].ranges.lin_vel_y == (0, 0)
+    assert cfg.commands["twist"].ranges.ang_vel_z == (0, 0)
+    assert type(cfg.commands["twist"]).__name__ == "ForwardRollPlayCommandCfg"
     assert cfg.events["set_roulade_state"].params["forward_vel_range"] == (0, 0)
 
 

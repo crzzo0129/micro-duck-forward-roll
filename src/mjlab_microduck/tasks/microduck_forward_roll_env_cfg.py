@@ -47,6 +47,9 @@ def make_microduck_forward_roll_env_cfg(play: bool = False):
         # The command contract stays 61D; evaluate the actual idle command.
         for name in ("lin_vel_x", "lin_vel_y", "ang_vel_z"):
             setattr(cfg.commands["twist"].ranges, name, (0.0, 0.0))
+        # Zero is outside the upstream viewer's Max slider range [0.1, 10].
+        # A read-only play command preserves the idle observation contract.
+        cfg.commands["twist"] = mdp.ForwardRollPlayCommandCfg(**vars(cfg.commands["twist"]))
     return cfg
 
 
